@@ -38,6 +38,7 @@ const TRANSPARENCY_LEVEL_SETTING_KEY = "transparency-level";
 const SHORTCUT_TYPE_SETTING_KEY = "shortcut-type";
 const OTHER_SHORTCUT_SETTING_KEY = "other-shortcut";
 const REAL_SHORTCUT_SETTING_KEY = "real-shortcut";
+const FULLSCREEN_SHORTCUT_SETTING_KEY = "fullscreen-shortcut";
 const ENABLE_TOGGLE_ON_SCROLL_SETTING_KEY = "enable-toggle-on-scroll";
 const FOREGROUND_COLOR_SETTING_KEY = "foreground-color";
 const BACKGROUND_COLOR_SETTING_KEY = "background-color";

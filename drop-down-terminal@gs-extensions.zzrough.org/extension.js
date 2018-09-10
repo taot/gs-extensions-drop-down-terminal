@@ -52,7 +52,7 @@ const ANIMATION_CONFLICT_EXTENSION_UUIDS = [
 
 const TERMINAL_WINDOW_ACTOR_NAME = "dropDownTerminalWindow";
 const TERMINAL_WINDOW_WM_CLASS = "DropDownTerminalWindow";
-const DEBUG = false;
+const DEBUG = true;
 
 const FIRST_START_SETTING_KEY = "first-start";
 const ENABLE_ANIMATION_SETTING_KEY = "enable-animation";
@@ -60,6 +60,7 @@ const OPENING_ANIMATION_TIME_SETTING_KEY = "opening-animation-time";
 const CLOSING_ANIMATION_TIME_SETTING_KEY = "closing-animation-time";
 const TERMINAL_SIZE_SETTING_KEY = "terminal-size";
 const REAL_SHORTCUT_SETTING_KEY = "real-shortcut";
+const FULLSCREEN_SHORTCUT_SETTING_KEY = "fullscreen-shortcut";
 const ENABLE_TOGGLE_ON_SCROLL_SETTING_KEY = "enable-toggle-on-scroll";
 const TERMINAL_POSITION_SETTING_KEY = "terminal-position";
 
@@ -200,7 +201,10 @@ const DropDownTerminalExtension = new Lang.Class({
         this._windowActor = null;
         this._firstDisplay = true;
 
-        // initializes if we should toggle on bus name appearance 
+        // initialize to not using full-screen
+        this._isFullScreen = false;
+
+        // initializes if we should toggle on bus name appearance
         this._toggleOnBusNameAppearance = false;
 
         // check dependencies
@@ -445,6 +449,17 @@ const DropDownTerminalExtension = new Lang.Class({
         }
     },
 
+    _toggleFullScreen: function() {
+        debug("asked to toggle full-screen");
+        debug('this._windowActor: ' + this._windowActor);
+        if (this._windowActor !== null) {
+            this._isFullScreen = ! this._isFullScreen;
+            debug("size changed");
+            this._windowActor.remove_clip();
+            Convenience.throttle(100, this, this._updateWindowGeometry); // throttles at 10Hz (it's an "heavy weight" setting)
+        }
+    },
+
     _panelScrolled: function(actor, event) {
         // checks if toggle on scroll is enabled
         if (!this._toggleOnScrollEnabled) {
@@ -481,44 +496,63 @@ const DropDownTerminalExtension = new Lang.Class({
         let panelBox = Main.layoutManager.panelBox;
         let sizeSpec = this._settings.get_string(TERMINAL_SIZE_SETTING_KEY);
         let panelHeight = Main.layoutManager.panelBox.height;
+        let tpos = panelBox.get_transformed_position();
 
         let scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        let screen = global.screen.get_monitor_geometry(global.screen.get_primary_monitor());
-        let bbox = Main.legacyTray ? Main.legacyTray.actor : screen;
-        let x1 = bbox.x / scaleFactor;
-        let y1 = bbox.y / scaleFactor;
-        let screenHeight = bbox.height / scaleFactor;
-        let screenWidth = bbox.width / scaleFactor;
-        let x2 = x1 + screenWidth;
-        let y2 = y1 + screenHeight;
+
+        let workarea = Main.layoutManager.getWorkAreaForMonitor(global.screen.get_primary_monitor());
+        let x1 = workarea.x / scaleFactor;
+        let y1 = workarea.y / scaleFactor;
+        let workareaHeight = workarea.height / scaleFactor;
+        let workareaWidth = workarea.width / scaleFactor;
+        let x2 = x1 + workareaWidth;
+        let y2 = y1 + workareaHeight;
 
         switch (terminalPosition) {
             case LEFT_EDGE:
                 this._windowX = x1;
-                this._windowY = panelBox.y == y1 ? y1 + panelBox.height: y1;
-                this._windowWidth = this._evaluateSizeSpec(sizeSpec, false);
-                this._windowHeight = panelBox.y == y1 ? screenHeight - panelHeight : screenHeight;
+                this._windowY = y1;
+                if (this._isFullScreen) {
+                    this._windowWidth = workareaWidth;
+                } else {
+                    this._windowWidth = this._evaluateSizeSpec(sizeSpec, false);
+                }
+                this._windowHeight = workareaHeight;
                 break;
             case RIGHT_EDGE:
-                let width = this._evaluateSizeSpec(sizeSpec, false);
+                let width;
+                if (this._isFullScreen) {
+                    width = workareaWidth;
+                } else {
+                    width = this._evaluateSizeSpec(sizeSpec, false);
+                }
                 this._windowX = x2 - width;
-                this._windowY = panelBox.y == y1 ? y1 + panelBox.height: y1;
+                this._windowY = y1;
                 this._windowWidth = width;
-                this._windowHeight = panelBox.y == y1 ? screenHeight - panelHeight : screenHeight;
+                this._windowHeight = workareaHeight;
                 break;
             case BOTTOM_EDGE:
-                let height = this._evaluateSizeSpec(sizeSpec, true);
+                let height;
+                if (this._isFullScreen) {
+                    height = workareaHeight;
+                } else {
+                    height = this._evaluateSizeSpec(sizeSpec, true);
+                }
                 this._windowX = x1;
-                this._windowY = panelBox.y + panelBox.height == y2 ? y2 - panelBox.height - height: y2 - height;
-                this._windowWidth = screenWidth;
+                this._windowY = y2 - height;
+                this._windowWidth = workareaWidth;
                 this._windowHeight = height;
                 break;
             default:
             case TOP_EDGE:
                 this._windowX = x1;
-                this._windowY = panelBox.y == y1 ? y1 + panelBox.height: y1;
-                this._windowWidth = screenWidth;
-                this._windowHeight = this._evaluateSizeSpec(sizeSpec, true);
+                this._windowY = y1;
+                this._windowWidth = workareaWidth;
+                if (this._isFullScreen) {
+                    this._windowHeight = workareaHeight;
+                } else {
+                    this._windowHeight = this._evaluateSizeSpec(sizeSpec, true);
+                }
                 break;
         }
 
@@ -549,13 +583,20 @@ const DropDownTerminalExtension = new Lang.Class({
             global.display.add_keybinding(REAL_SHORTCUT_SETTING_KEY, this._settings, Meta.KeyBindingFlags.NONE,
                                           Lang.bind(this, this._toggle));
 
+        Main.wm.addKeybinding(FULLSCREEN_SHORTCUT_SETTING_KEY, this._settings, Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.MESSAGE_TRAY,
+            Lang.bind(this, this._toggleFullScreen));
     },
 
     _unbindShortcut: function() {
-        if (Main.wm.removeKeybinding) // introduced in 3.7.2
+        if (Main.wm.removeKeybinding) { // introduced in 3.7.2
             Main.wm.removeKeybinding(REAL_SHORTCUT_SETTING_KEY);
-        else
+            Main.wm.removeKeybinding(FULLSCREEN_SHORTCUT_SETTING_KEY);
+        }
+        else {
             global.display.remove_keybinding(REAL_SHORTCUT_SETTING_KEY);
+            global.display.remove_keybinding(FULLSCREEN_SHORTCUT_SETTING_KEY);
+        }
     },
 
     _windowCreated: function(display, window) {
@@ -767,7 +808,7 @@ const DropDownTerminalExtension = new Lang.Class({
 
         // forgets about the child pid too, it will be find out again at the next toggle if the bus is
         // activated meanwhile
-        this._childPid = null; 
+        this._childPid = null;
     },
 
     _setWindowActor: function(actor) {
@@ -783,7 +824,7 @@ const DropDownTerminalExtension = new Lang.Class({
     },
 
     _evaluateSizeSpec: function(heightSpec, vertical) {
-        // updates the height from the height spec, so it's picked 
+        // updates the height from the height spec, so it's picked
         let match = heightSpec.trim().match(/^([1-9]\d*)\s*(px|%)$/i);
 
         if (match === null) {
@@ -820,7 +861,7 @@ const DropDownTerminalExtension = new Lang.Class({
             x1: Math.max(monitor.x, a.x1),
             y1: Math.max(monitor.y, a.y1),
             x2: Math.min(monitor.x + monitor.width, a.x2),
-            y2: Math.min(monitor.y + monitor.height, a.y2) 
+            y2: Math.min(monitor.y + monitor.height, a.y2)
         });
 
         clip.x1 -= this._windowActor.x;
@@ -887,9 +928,9 @@ const DropDownTerminalExtension = new Lang.Class({
         try {
             imports.gi.Vte;
         } catch (e) {
-            // creates and opens the dialog after 1 second 
+            // creates and opens the dialog after 1 second
             Mainloop.timeout_add_seconds(1, function() {
-                new MissingVteDialog().open();            
+                new MissingVteDialog().open();
                 return false;
             });
 

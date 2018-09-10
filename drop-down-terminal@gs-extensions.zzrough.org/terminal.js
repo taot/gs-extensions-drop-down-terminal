@@ -257,10 +257,18 @@ const DropDownTerminal = new Lang.Class({
         let [currentWidth, currentHeight] = this._window.get_size();
 
         Convenience.runInGdk(Lang.bind(this, function() {
+            log('x: ' + x);
+            log('y: ' + y);
+            log('currentX: ' + currentX);
+            log('currentY: ' + currentY);
             if (x != currentX || y != currentY) {
                 this._window.move(x, y);
             }
 
+            log('width: ' + width);
+            log('height: ' + height);
+            log('currentWidth: ' + currentWidth);
+            log('currentHeight: ' + currentHeight);
             if (width != currentWidth || height != currentHeight) {
                 this._window.resize(width, height);
             }

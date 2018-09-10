@@ -41,7 +41,7 @@ function getSettings(extensionPath, extensionId) {
     let schema = source.lookup(schemaId, false); // recursive = false
 
     if (!schema) {
-       throw new Error("Schema " + schemaId + " could not be found in the path " + extensionPath); 
+       throw new Error("Schema " + schemaId + " could not be found in the path " + extensionPath);
     }
 
     return new Gio.Settings({
