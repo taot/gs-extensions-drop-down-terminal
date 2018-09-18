@@ -22,7 +22,6 @@ const Mainloop = imports.mainloop;
 const Clutter = imports.gi.Clutter;
 const Cogl = imports.gi.Cogl;
 const Gdk = imports.gi.Gdk;
-const GdkX11 = imports.gi.GdkX11;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const Gtk = imports.gi.Gtk;
@@ -211,7 +210,7 @@ const DropDownTerminalExtension = new Lang.Class({
         this._checkDependencies();
 
         // animation setup
-        this._display = global.screen.get_display();
+        this._display = global.get_display();
         this._windowCreatedHandlerId = this._display.connect("window-created", Lang.bind(this, this._windowCreated));
         this._actorMappedHandlerId = global.window_manager.connect("map", Lang.bind(this, this._windowMapped));
 
@@ -500,7 +499,7 @@ const DropDownTerminalExtension = new Lang.Class({
 
         let scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
 
-        let workarea = Main.layoutManager.getWorkAreaForMonitor(global.screen.get_primary_monitor());
+        let workarea = Main.layoutManager.getWorkAreaForMonitor(global.get_display().get_primary_monitor());
         let x1 = workarea.x / scaleFactor;
         let y1 = workarea.y / scaleFactor;
         let workareaHeight = workarea.height / scaleFactor;
@@ -569,22 +568,22 @@ const DropDownTerminalExtension = new Lang.Class({
     _bindShortcut: function() {
         if (Main.wm.addKeybinding && Shell.ActionMode) // introduced in 3.16
             Main.wm.addKeybinding(REAL_SHORTCUT_SETTING_KEY, this._settings, Meta.KeyBindingFlags.NONE,
-                                  Shell.ActionMode.NORMAL | Shell.ActionMode.MESSAGE_TRAY,
+                                  Shell.ActionMode.NORMAL,
                                   Lang.bind(this, this._toggle));
         else if (Main.wm.addKeybinding && Shell.KeyBindingMode) // introduced in 3.7.5
             Main.wm.addKeybinding(REAL_SHORTCUT_SETTING_KEY, this._settings, Meta.KeyBindingFlags.NONE,
-                                  Shell.KeyBindingMode.NORMAL | Shell.KeyBindingMode.MESSAGE_TRAY,
+                                  Shell.KeyBindingMode.NORMAL,
                                   Lang.bind(this, this._toggle));
         else if (Main.wm.addKeybinding && Main.KeybindingMode) // introduced in 3.7.2
             Main.wm.addKeybinding(REAL_SHORTCUT_SETTING_KEY, this._settings, Meta.KeyBindingFlags.NONE,
-                                  Main.KeybindingMode.NORMAL | Main.KeybindingMode.MESSAGE_TRAY,
+                                  Main.KeybindingMode.NORMAL,
                                   Lang.bind(this, this._toggle));
         else
             global.display.add_keybinding(REAL_SHORTCUT_SETTING_KEY, this._settings, Meta.KeyBindingFlags.NONE,
                                           Lang.bind(this, this._toggle));
 
         Main.wm.addKeybinding(FULLSCREEN_SHORTCUT_SETTING_KEY, this._settings, Meta.KeyBindingFlags.NONE,
-            Shell.ActionMode.NORMAL | Shell.ActionMode.MESSAGE_TRAY,
+            Shell.ActionMode.NORMAL,
             Lang.bind(this, this._toggleFullScreen));
     },
 
